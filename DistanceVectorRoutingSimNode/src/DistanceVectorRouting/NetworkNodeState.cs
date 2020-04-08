@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using DistanceVectorRoutingSimNode.Logging;
 
 namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 {
@@ -48,9 +49,16 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                     _neighbors[neighbor] = endpoint;
                 }
             }
+
+            Logger.WriteLine("Updated neighbor endpoints:");
+            foreach (var (neighbor, endpoint) in _neighbors)
+            {
+                Logger.WriteLine($"{neighbor} - {endpoint?.ToString() ?? "Not Found"}");
+            }
+            Logger.WriteLine("");
         }
 
-        public async Task Update(string sourceNode, ForwardingTable otherTable)
+        public async Task UpdateForwardingTable(string sourceNode, ForwardingTable otherTable)
         {
             await _forwardingMutex.WaitAsync();
             var pathToSource = _forwardingTable.GetCost(sourceNode);
