@@ -9,34 +9,25 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
     {
         private readonly Dictionary<string, ForwardingTableRecord> _table;
 
-        public static byte[] Encode(ForwardingTable forwardingTable)
+        public static string Encode(ForwardingTable forwardingTable)
         {
             return forwardingTable.Encode();
         }
 
-        public static ForwardingTable? Decode(byte[] encodedForwardingTable)
+        public static ForwardingTable? Decode(string stringifiedForwardingTable)
         {
-            try
-            {
-                var stringifiedForwardingTable = Encoding.UTF8.GetString(encodedForwardingTable);
-                var lines = stringifiedForwardingTable.Split("\r\n");
+            var lines = stringifiedForwardingTable.Split("\r\n")[..^1];
 
-                ForwardingTable table = new ForwardingTable();
-                foreach (var line in lines)
-                {
-                    var splitLine = line.Split(" ");
-                    var destination = splitLine[0];
-                    var pathCost = Double.Parse(splitLine[1]);
-                    var nextHop = splitLine[2];
-                    table.UpsertPath(destination, pathCost, nextHop);
-                }
-                return table;
-            }
-            catch (Exception ex)
+            ForwardingTable table = new ForwardingTable();
+            foreach (var line in lines)
             {
-                Console.WriteLine(ex.Message);
-                return null;
+                var splitLine = line.Split(" ");
+                var destination = splitLine[0];
+                var pathCost = Double.Parse(splitLine[1]);
+                var nextHop = splitLine[2];
+                table.UpsertPath(destination, pathCost, nextHop);
             }
+            return table;
         }
 
         public ForwardingTable()
@@ -82,13 +73,17 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return _table.ContainsKey(destination);
         }
 
-        public bool UpsertPath(string destination, double cost, string nextHop)
+        public bool UpsertPath(string destination, double cost, string? nextHop)
         {
             if (_table.ContainsKey(destination))
             {
                 _table[destination].PathCost = cost;
                 _table[destination].NextHop = nextHop;
                 return false;
+            }
+            else
+            {
+                _table.Add(destination, new ForwardingTableRecord(cost, nextHop));
             }
 
             return true;
@@ -99,7 +94,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return _table;
         }
 
-        public byte[] Encode()
+        public string Encode()
         {
             var sb = new StringBuilder();
 
@@ -108,7 +103,19 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                 sb.Append($"{destination} {record.PathCost} {record.NextHop}\r\n");
             }
 
-            return Encoding.UTF8.GetBytes(sb.ToString());
+            return sb.ToString();
+        }
+
+        public string ToString(string source)
+        {
+            var sb = new StringBuilder();
+
+            foreach (var (destination, record) in _table)
+            {
+                sb.Append($"shortest path {source}-{destination}: the next hop is {record.NextHop ?? "nil"} and the cost is {record.PathCost}\n");
+            }
+
+            return sb.ToString();
         }
     }
 }

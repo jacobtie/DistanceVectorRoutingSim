@@ -25,9 +25,9 @@ namespace DistanceVectorRoutingSimNode.Logging
             _sb.Append(message + "\n");
         }
 
-        public static void Output()
+        public static void Output(string name)
         {
-            var fileName = Path.Combine("logs", $"{DateTime.Now.ToFileTimeUtc()}_log.txt");
+            var fileName = Path.Combine("logs", $"{DateTime.Now.ToFileTimeUtc()}_node_{name}_log.txt");
             WriteLine($"Writing to output file: {fileName}");
             using (var writer = new StreamWriter(fileName))
             {

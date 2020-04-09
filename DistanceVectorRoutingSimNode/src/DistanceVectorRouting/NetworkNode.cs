@@ -19,6 +19,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
         private IPEndPoint _masterEndpoint;
         private NetworkNodeState _state;
         private CancellationTokenSource _cancellationTokenSource;
+        private int _iterations;
 
         public static void RunNode(string name, int nodePort, IPEndPoint masterEndpoint)
         {
@@ -30,12 +31,11 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 
             var node = new NetworkNode(name, ipAddress, nodePort, masterEndpoint);
 
-            var masterTask = Task.Run(() => node.ListenForMaster(), node._getToken());
-            var registerTask = Task.Run(() => node.RegisterToMaster(), node._getToken());
-            var neighborTask = Task.Run(() => node.ListenForNeighbors(), node._getToken());
-            var sendTask = Task.Run(() => node.SendUpdates(), node._getToken());
+            var listeningTask = Task.Run(() => node.Listen());
+            var registerTask = Task.Run(() => node.RegisterToMaster());
+            var sendTask = Task.Run(() => node.SendUpdates());
 
-            var tasks = new Task[] { registerTask, masterTask, neighborTask, sendTask };
+            var tasks = new Task[] { listeningTask, registerTask, sendTask };
 
             string keyInfo;
             do
@@ -51,7 +51,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 
             Task.WaitAll(tasks);
 
-            Logger.Output();
+            Logger.Output(node._name);
         }
 
         public NetworkNode(string name, IPAddress ipAddress, int nodePort, IPEndPoint masterEndpoint)
@@ -61,8 +61,9 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             _port = nodePort;
             _masterEndpoint = masterEndpoint;
             var inputFile = Path.Combine("input-files", $"{name}.dat");
-            _state = new NetworkNodeState(inputFile);
+            _state = new NetworkNodeState(_name, inputFile);
             _cancellationTokenSource = new CancellationTokenSource();
+            _iterations = 0;
         }
 
         public void StopNode()
@@ -82,9 +83,9 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             }
         }
 
-        public async Task ListenForMaster()
+        public async Task Listen()
         {
-            Logger.WriteLine("Listening for registration update broadcasts from master...\n");
+            Logger.WriteLine("Listening...");
             using (var socket = _initSocket())
             {
                 using (var cancellation = _cancellationTokenSource.Token.Register(() => socket.Dispose()))
@@ -103,56 +104,105 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                         }
                         catch
                         {
-                            Logger.WriteLine("Stopping listening for registration broadcasts");
+                            Logger.WriteLine("Stopping listening");
                             return;
                         }
 
-                        Logger.WriteLine("Received master registration update broadcast. Parsing...");
+                        var message = Encoding.UTF8.GetString(buffer.Take(result.ReceivedBytes).ToArray());
 
-                        try
+                        var messageTypeAndBody = message.Split("!-----!");
+                        var (messageType, messageBody) = (messageTypeAndBody[0], messageTypeAndBody[1]);
+
+                        if (messageType.Equals("M"))
                         {
-                            var byteMessage = buffer.Take(result.ReceivedBytes).ToArray();
-                            var decodedMessage = Encoding.UTF8.GetString(byteMessage);
-
-                            var neighborUpdate = new Dictionary<string, IPEndPoint>();
-                            foreach (var line in decodedMessage.Split("\r\n")[..^1])
-                            {
-                                var splitLine = line.Split(" ");
-                                var neighborName = splitLine[0];
-                                var neighborAddress = IPAddress.Parse(splitLine[1]);
-                                var port = Int32.Parse(splitLine[2]);
-                                neighborUpdate.Add(neighborName, new IPEndPoint(neighborAddress, port));
-                            }
-
-                            _state.UpdateEndpoints(neighborUpdate);
+                            _ = Task.Run(() => MasterDispatch(messageBody));
                         }
-                        catch (Exception ex)
+                        else if (messageType.Equals("N"))
                         {
-                            Logger.WriteLine(ex.Message);
+                            _ = Task.Run(() => NeighborDispatch(messageBody));
                         }
+                    }
+
+                }
+            }
+        }
+
+        public void MasterDispatch(string message)
+        {
+            Logger.WriteLine("Received master registration update broadcast. Parsing...");
+            var neighborUpdate = new Dictionary<string, IPEndPoint>();
+            foreach (var line in message.Split("\r\n")[..^1])
+            {
+                var splitLine = line.Split(" ");
+                var neighborName = splitLine[0];
+                var neighborAddress = IPAddress.Parse(splitLine[1]);
+                var port = Int32.Parse(splitLine[2]);
+                neighborUpdate.Add(neighborName, new IPEndPoint(neighborAddress, port));
+            }
+
+            _state.UpdateEndpoints(neighborUpdate);
+        }
+
+        public async Task NeighborDispatch(string message)
+        {
+            var messageSplit = message.Split("***");
+            var (sourceNode, stringifiedForwardingTable) = (messageSplit[0], messageSplit[1]);
+            Logger.WriteLine("Received neighbor update. Parsing...");
+            var otherForwardingTable = ForwardingTable.Decode(stringifiedForwardingTable);
+
+            if (otherForwardingTable is null)
+            {
+                return;
+            }
+
+            Logger.WriteLine($"Received update from neighbor {sourceNode}\n");
+
+            await _state.UpdateForwardingTable(sourceNode, otherForwardingTable);
+        }
+
+        public async Task SendUpdates()
+        {
+            while (true)
+            {
+                try
+                {
+                    await Task.Delay(15000, _cancellationTokenSource.Token);
+                }
+                catch (TaskCanceledException) when (_cancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    Logger.WriteLine("Stopping sending updates to neighbors");
+                    return;
+                }
+
+                Logger.WriteLine("Reinitializing from input file");
+                await _state.ReInitialize();
+
+                Logger.WriteLine("Sending updates to neighbors\n");
+                Logger.WriteLine($"output number {++_iterations}");
+                Logger.WriteLine(_state.forwardingTable.ToString(_name));
+
+                foreach (var (neighbor, endpoint) in _state.Neighbors)
+                {
+                    if (endpoint is null)
+                    {
+                        continue;
+                    }
+
+                    var forwardingTable = _state.forwardingTable;
+                    var stringifiedForwardingTable = ForwardingTable.Encode(forwardingTable);
+                    var encodedMessage = Encoding.UTF8.GetBytes("N!-----!" + _name + "***" + stringifiedForwardingTable);
+
+                    using (var socket = _initSocket())
+                    {
+                        await socket.SendToAsync(encodedMessage, SocketFlags.None, endpoint);
                     }
                 }
             }
         }
 
-        public async Task ListenForNeighbors()
-        {
-            // TODO: Write listener socket to listen for updates from neighbors
-        }
-
-        public async Task SendUpdates()
-        {
-            // TODO: Write sending socket to send updates to neighbors every 15 seconds
-        }
-
         private Socket _initSocket()
         {
             return new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
-        }
-
-        private CancellationToken _getToken()
-        {
-            return _cancellationTokenSource.Token;
         }
     }
 }

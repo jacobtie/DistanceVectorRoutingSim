@@ -112,6 +112,7 @@ namespace DistanceVectorRoutingSimMasterNode.Master
         {
             var sb = new StringBuilder();
             var endpoints = new List<IPEndPoint>();
+            sb.Append("M!-----!");
             foreach (var (destination, endpoint) in _nodeLocations)
             {
                 sb.Append($"{destination} {endpoint.Address.ToString()} {endpoint.Port}\r\n");
@@ -121,7 +122,7 @@ namespace DistanceVectorRoutingSimMasterNode.Master
             var message = sb.ToString();
 
             Logger.WriteLine("Broadcasting node registration update:");
-            Logger.WriteLine(message);
+            Logger.WriteLine(message.Substring(8));
 
             var encodedMessage = Encoding.UTF8.GetBytes(sb.ToString());
             foreach (var endpoint in endpoints)

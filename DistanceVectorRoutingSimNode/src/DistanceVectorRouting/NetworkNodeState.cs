@@ -12,13 +12,23 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
     {
         private readonly SemaphoreSlim _forwardingMutex;
         private readonly ForwardingTable _forwardingTable;
-        private readonly Dictionary<string, IPEndPoint?> _neighbors;
+        private readonly Dictionary<string, IPEndPoint?> _neighborsEndpoints;
+        private readonly Dictionary<string, double> _neighborsCost;
+        private readonly string _inputFile;
 
-        public NetworkNodeState(string inputFile)
+        public Dictionary<string, IPEndPoint?> Neighbors => _neighborsEndpoints;
+
+        public ForwardingTable forwardingTable => _forwardingTable;
+
+        public NetworkNodeState(string name, string inputFile)
         {
+            _inputFile = inputFile;
             _forwardingMutex = new SemaphoreSlim(1, 1);
             _forwardingTable = new ForwardingTable();
-            _neighbors = new Dictionary<string, IPEndPoint?>();
+            _neighborsEndpoints = new Dictionary<string, IPEndPoint?>();
+            _neighborsCost = new Dictionary<string, double>();
+
+            _forwardingTable.UpsertPath(name, 0, null);
 
             try
             {
@@ -30,12 +40,16 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                     double cost = Double.Parse(splitLine[1]);
 
                     _forwardingTable.UpsertPath(neighbor, cost, neighbor);
-                    _neighbors.Add(neighbor, null);
+                    _neighborsEndpoints.Add(neighbor, null);
+                    _neighborsCost.Add(neighbor, cost);
                 }
+
+                Logger.WriteLine("initial forwarding table");
+                Logger.WriteLine(_forwardingTable.ToString(name));
             }
             catch (Exception ex)
             {
-                Console.WriteLine(ex.Message);
+                Logger.WriteLine(ex.Message);
                 throw ex;
             }
         }
@@ -44,14 +58,14 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
         {
             foreach (var (neighbor, endpoint) in incomingEndpoints)
             {
-                if (_neighbors.ContainsKey(neighbor))
+                if (Neighbors.ContainsKey(neighbor))
                 {
-                    _neighbors[neighbor] = endpoint;
+                    Neighbors[neighbor] = endpoint;
                 }
             }
 
             Logger.WriteLine("Updated neighbor endpoints:");
-            foreach (var (neighbor, endpoint) in _neighbors)
+            foreach (var (neighbor, endpoint) in Neighbors)
             {
                 Logger.WriteLine($"{neighbor} - {endpoint?.ToString() ?? "Not Found"}");
             }
@@ -61,25 +75,27 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
         public async Task UpdateForwardingTable(string sourceNode, ForwardingTable otherTable)
         {
             await _forwardingMutex.WaitAsync();
-            var pathToSource = _forwardingTable.GetCost(sourceNode);
+            var pathToSource = _neighborsCost[sourceNode];
 
             foreach (var (destination, record) in otherTable.GetRecords())
             {
                 var cost = record.PathCost + pathToSource;
 
-                if (!_forwardingTable.Exists(destination) || cost < _forwardingTable.GetCost(destination))
+                if (!forwardingTable.Exists(destination) ||
+                    (forwardingTable.GetNextHop(destination)?.Equals(sourceNode) ?? false) ||
+                    cost < forwardingTable.GetCost(destination))
                 {
-                    _forwardingTable.UpsertPath(destination, cost, sourceNode);
+                    forwardingTable.UpsertPath(destination, cost, sourceNode);
                 }
             }
             _forwardingMutex.Release();
         }
 
-        public async Task ReInitialize(string inputFile)
+        public async Task ReInitialize()
         {
             try
             {
-                var fileContents = File.ReadAllLines(inputFile);
+                var fileContents = await File.ReadAllLinesAsync(_inputFile);
                 await _forwardingMutex.WaitAsync();
                 foreach (var line in fileContents[1..])
                 {
@@ -87,7 +103,11 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                     var neighbor = splitLine[0];
                     double cost = Double.Parse(splitLine[1]);
 
-                    _forwardingTable.UpsertPath(neighbor, cost, neighbor);
+                    if ((forwardingTable.GetNextHop(neighbor)?.Equals(neighbor) ?? true) ||
+                    cost < forwardingTable.GetCost(neighbor))
+                    {
+                        forwardingTable.UpsertPath(neighbor, cost, neighbor);
+                    }
                 }
                 _forwardingMutex.Release();
             }
