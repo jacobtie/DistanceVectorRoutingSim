@@ -24,16 +24,16 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
         public static void RunNode(string name, int nodePort, IPEndPoint masterEndpoint)
         {
             Logger.WriteLine($"Starting node {name}. Enter q to stop node.");
-            var ipAddresses = Dns.GetHostAddresses("localhost");
+            var ipAddresses = Dns.GetHostAddresses(Dns.GetHostName());
             var ipAddress = ipAddresses.First(ip => ip.AddressFamily == AddressFamily.InterNetwork);
 
             Logger.WriteLine($"Found IP Address: {ipAddress.ToString()}\n");
 
             var node = new NetworkNode(name, ipAddress, nodePort, masterEndpoint);
 
-            var listeningTask = Task.Run(() => node.Listen());
-            var registerTask = Task.Run(() => node.RegisterToMaster());
-            var sendTask = Task.Run(() => node.SendUpdates());
+            var listeningTask = Task.Run(() => node._listen());
+            var registerTask = Task.Run(() => node._registerToMaster());
+            var sendTask = Task.Run(() => node._sendUpdates());
 
             var tasks = new Task[] { listeningTask, registerTask, sendTask };
 
@@ -44,7 +44,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                 if (keyInfo.ToUpper() == "Q")
                 {
                     Console.WriteLine();
-                    node.StopNode();
+                    node._stopNode();
                 }
             }
             while (keyInfo.ToUpper() != "Q");
@@ -54,7 +54,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             Logger.Output(node._name);
         }
 
-        public NetworkNode(string name, IPAddress ipAddress, int nodePort, IPEndPoint masterEndpoint)
+        private NetworkNode(string name, IPAddress ipAddress, int nodePort, IPEndPoint masterEndpoint)
         {
             _name = name;
             _ipAddress = ipAddress;
@@ -66,13 +66,13 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             _iterations = 0;
         }
 
-        public void StopNode()
+        private void _stopNode()
         {
             Logger.WriteLine("Shutting down node...");
             _cancellationTokenSource.Cancel();
         }
 
-        public async Task RegisterToMaster()
+        private async Task _registerToMaster()
         {
             Logger.WriteLine("Registering to master\n");
             var encodedName = Encoding.UTF8.GetBytes($"{_name} {_port}");
@@ -83,7 +83,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             }
         }
 
-        public async Task Listen()
+        private async Task _listen()
         {
             Logger.WriteLine("Listening...");
             using (var socket = _initSocket())
@@ -115,11 +115,11 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 
                         if (messageType.Equals("M"))
                         {
-                            _ = Task.Run(() => MasterDispatch(messageBody));
+                            _ = Task.Run(() => _masterDispatch(messageBody));
                         }
                         else if (messageType.Equals("N"))
                         {
-                            _ = Task.Run(() => NeighborDispatch(messageBody));
+                            _ = Task.Run(() => _neighborDispatch(messageBody));
                         }
                     }
 
@@ -127,7 +127,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             }
         }
 
-        public void MasterDispatch(string message)
+        private void _masterDispatch(string message)
         {
             Logger.WriteLine("Received master registration update broadcast. Parsing...");
             var neighborUpdate = new Dictionary<string, IPEndPoint>();
@@ -143,7 +143,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             _state.UpdateEndpoints(neighborUpdate);
         }
 
-        public async Task NeighborDispatch(string message)
+        private async Task _neighborDispatch(string message)
         {
             var messageSplit = message.Split("***");
             var (sourceNode, stringifiedForwardingTable) = (messageSplit[0], messageSplit[1]);
@@ -160,7 +160,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             await _state.UpdateForwardingTable(sourceNode, otherForwardingTable);
         }
 
-        public async Task SendUpdates()
+        private async Task _sendUpdates()
         {
             while (true)
             {

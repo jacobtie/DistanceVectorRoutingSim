@@ -8,7 +8,7 @@ using DistanceVectorRoutingSimNode.Logging;
 
 namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 {
-    public class NetworkNodeState
+    internal class NetworkNodeState
     {
         private readonly SemaphoreSlim _forwardingMutex;
         private readonly ForwardingTable _forwardingTable;
@@ -16,11 +16,11 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
         private readonly Dictionary<string, double> _neighborsCost;
         private readonly string _inputFile;
 
-        public Dictionary<string, IPEndPoint?> Neighbors => _neighborsEndpoints;
+        internal Dictionary<string, IPEndPoint?> Neighbors => _neighborsEndpoints;
 
-        public ForwardingTable forwardingTable => _forwardingTable;
+        internal ForwardingTable forwardingTable => _forwardingTable;
 
-        public NetworkNodeState(string name, string inputFile)
+        internal NetworkNodeState(string name, string inputFile)
         {
             _inputFile = inputFile;
             _forwardingMutex = new SemaphoreSlim(1, 1);
@@ -54,7 +54,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             }
         }
 
-        public void UpdateEndpoints(Dictionary<string, IPEndPoint> incomingEndpoints)
+        internal void UpdateEndpoints(Dictionary<string, IPEndPoint> incomingEndpoints)
         {
             foreach (var (neighbor, endpoint) in incomingEndpoints)
             {
@@ -72,7 +72,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             Logger.WriteLine("");
         }
 
-        public async Task UpdateForwardingTable(string sourceNode, ForwardingTable otherTable)
+        internal async Task UpdateForwardingTable(string sourceNode, ForwardingTable otherTable)
         {
             await _forwardingMutex.WaitAsync();
             var pathToSource = _neighborsCost[sourceNode];
@@ -91,7 +91,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             _forwardingMutex.Release();
         }
 
-        public async Task ReInitialize()
+        internal async Task ReInitialize()
         {
             try
             {

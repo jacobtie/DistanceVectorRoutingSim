@@ -39,7 +39,7 @@ namespace DistanceVectorRoutingSimNode
 
             if (valid)
             {
-                NetworkNode.RunNode(name!, nodePort, new IPEndPoint(ip, masterPort));
+                NetworkNode.RunNode(name, nodePort, new IPEndPoint(ip, masterPort));
             }
 
             Console.WriteLine("\nPress enter to exit...");

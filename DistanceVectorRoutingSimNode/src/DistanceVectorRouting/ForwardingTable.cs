@@ -1,20 +1,19 @@
 using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Text;
 
 namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 {
-    public class ForwardingTable
+    internal class ForwardingTable
     {
         private readonly Dictionary<string, ForwardingTableRecord> _table;
 
-        public static string Encode(ForwardingTable forwardingTable)
+        internal static string Encode(ForwardingTable forwardingTable)
         {
             return forwardingTable.Encode();
         }
 
-        public static ForwardingTable? Decode(string stringifiedForwardingTable)
+        internal static ForwardingTable Decode(string stringifiedForwardingTable)
         {
             var lines = stringifiedForwardingTable.Split("\r\n")[..^1];
 
@@ -30,12 +29,12 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return table;
         }
 
-        public ForwardingTable()
+        internal ForwardingTable()
         {
             _table = new Dictionary<string, ForwardingTableRecord>();
         }
 
-        public (double pathCost, string? nextHop) GetForwarding(string destination)
+        internal (double pathCost, string? nextHop) GetForwarding(string destination)
         {
             var record = _table[destination];
             if (record is null)
@@ -46,7 +45,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return (record.PathCost, record.NextHop);
         }
 
-        public double GetCost(string destination)
+        internal double GetCost(string destination)
         {
             var record = _table[destination];
             if (record is null)
@@ -57,7 +56,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return record.PathCost;
         }
 
-        public string? GetNextHop(string destination)
+        internal string? GetNextHop(string destination)
         {
             var record = _table[destination];
             if (record is null)
@@ -68,12 +67,12 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return record.NextHop;
         }
 
-        public bool Exists(string destination)
+        internal bool Exists(string destination)
         {
             return _table.ContainsKey(destination);
         }
 
-        public bool UpsertPath(string destination, double cost, string? nextHop)
+        internal bool UpsertPath(string destination, double cost, string? nextHop)
         {
             if (_table.ContainsKey(destination))
             {
@@ -81,20 +80,17 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                 _table[destination].NextHop = nextHop;
                 return false;
             }
-            else
-            {
-                _table.Add(destination, new ForwardingTableRecord(cost, nextHop));
-            }
 
+            _table.Add(destination, new ForwardingTableRecord(cost, nextHop));
             return true;
         }
 
-        public Dictionary<string, ForwardingTableRecord> GetRecords()
+        internal Dictionary<string, ForwardingTableRecord> GetRecords()
         {
             return _table;
         }
 
-        public string Encode()
+        internal string Encode()
         {
             var sb = new StringBuilder();
 
@@ -106,7 +102,7 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
             return sb.ToString();
         }
 
-        public string ToString(string source)
+        internal string ToString(string source)
         {
             var sb = new StringBuilder();
 

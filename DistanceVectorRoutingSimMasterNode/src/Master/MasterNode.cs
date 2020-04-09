@@ -20,7 +20,7 @@ namespace DistanceVectorRoutingSimMasterNode.Master
             Logger.WriteLine("Starting master node");
             var masterNode = new MasterNode();
 
-            var registrationTask = Task.Run(() => masterNode.ListenForRegistration(), masterNode._getToken());
+            var registrationTask = Task.Run(() => masterNode.ListenForRegistration());
 
             var tasks = new Task[] { registrationTask };
 
@@ -60,9 +60,12 @@ namespace DistanceVectorRoutingSimMasterNode.Master
             {
                 using (var cancellation = _cancellationTokenSource.Token.Register(() => socket.Dispose()))
                 {
-                    var ipAddresses = await Dns.GetHostAddressesAsync("localhost");
+                    var ipAddresses = await Dns.GetHostAddressesAsync(Dns.GetHostName());
                     var ipAddress = ipAddresses.First(ip => ip.AddressFamily == AddressFamily.InterNetwork);
-                    socket.Bind(new IPEndPoint(ipAddress, 42069));
+                    var ipEndpoint = new IPEndPoint(ipAddress, 42069);
+                    socket.Bind(ipEndpoint);
+
+                    Logger.WriteLine($"Running on {ipEndpoint.ToString()}");
 
                     try
                     {
@@ -124,7 +127,7 @@ namespace DistanceVectorRoutingSimMasterNode.Master
             Logger.WriteLine("Broadcasting node registration update:");
             Logger.WriteLine(message.Substring(8));
 
-            var encodedMessage = Encoding.UTF8.GetBytes(sb.ToString());
+            var encodedMessage = Encoding.UTF8.GetBytes(message);
             foreach (var endpoint in endpoints)
             {
                 _ = Task.Run(() => _broadcastEndpointsToNode(encodedMessage, endpoint));
@@ -144,11 +147,6 @@ namespace DistanceVectorRoutingSimMasterNode.Master
             var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
 
             return socket;
-        }
-
-        private CancellationToken _getToken()
-        {
-            return _cancellationTokenSource.Token;
         }
     }
 }
