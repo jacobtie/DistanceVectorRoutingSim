@@ -113,5 +113,17 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
 
             return sb.ToString();
         }
+
+        internal ForwardingTable Clone()
+        {
+            var ft = new ForwardingTable();
+
+            foreach (var (destination, record) in _table)
+            {
+                ft.UpsertPath(destination, record.PathCost, record.NextHop);
+            }
+
+            return ft;
+        }
     }
 }

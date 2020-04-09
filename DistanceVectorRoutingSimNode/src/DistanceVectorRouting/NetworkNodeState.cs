@@ -108,6 +108,12 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                     {
                         forwardingTable.UpsertPath(neighbor, cost, neighbor);
                     }
+
+                    if (cost != _neighborsCost[neighbor])
+                    {
+                        Logger.WriteLine($"Link to {neighbor} changed from {_neighborsCost[neighbor]} to {cost}!");
+                        _neighborsCost[neighbor] = cost;
+                    }
                 }
                 _forwardingMutex.Release();
             }

@@ -188,7 +188,16 @@ namespace DistanceVectorRoutingSimNode.DistanceVectorRouting
                         continue;
                     }
 
-                    var forwardingTable = _state.forwardingTable;
+                    var forwardingTable = _state.forwardingTable.Clone();
+
+                    foreach (var (destination, record) in forwardingTable.GetRecords())
+                    {
+                        if (record.NextHop?.Equals(neighbor) ?? false)
+                        {
+                            record.PathCost = Double.PositiveInfinity;
+                        }
+                    }
+
                     var stringifiedForwardingTable = ForwardingTable.Encode(forwardingTable);
                     var encodedMessage = Encoding.UTF8.GetBytes("N!-----!" + _name + "***" + stringifiedForwardingTable);
 
