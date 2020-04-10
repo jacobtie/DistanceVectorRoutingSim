@@ -18,6 +18,9 @@ namespace DistanceVectorRoutingSimMasterNode.Master
 {
     public class MasterNode
     {
+        // Port on which master listens
+        private int _port;
+
         // Dictionary of IP addresses and ports for each node name
         private Dictionary<string, IPEndPoint> _nodeLocations;
 
@@ -25,10 +28,10 @@ namespace DistanceVectorRoutingSimMasterNode.Master
         private CancellationTokenSource _cancellationTokenSource;
 
         // Method to begin running the master node
-        public static void RunMaster()
+        public static void RunMaster(int port)
         {
             Logger.WriteLine("Starting master node");
-            var masterNode = new MasterNode();
+            var masterNode = new MasterNode(port);
 
             // Create tasks to listen for the registration of the nodes
             var registrationTask = Task.Run(() => masterNode.ListenForRegistration());
@@ -54,9 +57,10 @@ namespace DistanceVectorRoutingSimMasterNode.Master
         }
 
         // Constructor for the master node
-        private MasterNode()
+        private MasterNode(int port)
         {
             // Initialize fields
+            _port = port;
             _nodeLocations = new Dictionary<string, IPEndPoint>();
             _cancellationTokenSource = new CancellationTokenSource();
         }
@@ -79,7 +83,7 @@ namespace DistanceVectorRoutingSimMasterNode.Master
                     // Get the IPv4 Address and port number to bind with the socket
                     var ipAddresses = await Dns.GetHostAddressesAsync(Dns.GetHostName());
                     var ipAddress = ipAddresses.First(ip => ip.AddressFamily == AddressFamily.InterNetwork);
-                    var ipEndpoint = new IPEndPoint(ipAddress, 42069);
+                    var ipEndpoint = new IPEndPoint(ipAddress, _port);
                     socket.Bind(ipEndpoint);
 
                     Logger.WriteLine($"Running on {ipEndpoint.ToString()}");
@@ -90,7 +94,7 @@ namespace DistanceVectorRoutingSimMasterNode.Master
                         {
                             // Make buffer and endpoint to receive info from the nodes
                             var buffer = new byte[2048];
-                            EndPoint receivedEndpoint = new IPEndPoint(IPAddress.Any, 42069);
+                            EndPoint receivedEndpoint = new IPEndPoint(IPAddress.Any, _port);
 
                             // Get the result from the socket
                             var result = await socket.ReceiveFromAsync(buffer, SocketFlags.None, receivedEndpoint);

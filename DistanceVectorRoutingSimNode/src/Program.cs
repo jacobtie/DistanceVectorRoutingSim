@@ -34,7 +34,7 @@ namespace DistanceVectorRoutingSimNode
                 }
                 else
                 {
-                    Console.WriteLine("Usage: dotnet run <node_name> <master_ip> <master_port>");
+                    Console.WriteLine("Usage: dotnet run <node_name> <node_port> <master_ip> <master_port>");
                 }
             }
             catch (Exception ex)

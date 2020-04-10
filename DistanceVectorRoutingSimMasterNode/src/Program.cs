@@ -7,8 +7,15 @@ namespace DistanceVectorRoutingSimMasterNode
     {
         static void Main(string[] args)
         {
-            // Run master node
-            MasterNode.RunMaster();
+            if (args.Length == 1 && Int32.TryParse(args[0], out int port))
+            {
+                // Run master node
+                MasterNode.RunMaster(port);
+            }
+            else
+            {
+                Console.WriteLine("Usage: dotnet run <port>");
+            }
 
             Console.WriteLine("\nPress enter to exit...");
             Console.ReadLine();
