@@ -7,6 +7,7 @@ namespace DistanceVectorRoutingSimMasterNode
     {
         static void Main(string[] args)
         {
+            // Run master node
             MasterNode.RunMaster();
 
             Console.WriteLine("\nPress enter to exit...");
